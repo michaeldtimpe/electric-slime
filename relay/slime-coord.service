@@ -1,0 +1,18 @@
+[Unit]
+Description=electric-slime coordinator (the swarm's arena)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# fill in USER and STANDBY_URL (site.env) before installing
+User=USER
+WorkingDirectory=/home/USER/electric-slime
+ExecStart=/usr/bin/python3 -u /home/USER/electric-slime/coord.py serve --port 8700 --budget 16000 --state /home/USER/electric-slime/coord-state.json --depot /home/USER/electric-slime/depot --admin-token-file /home/USER/electric-slime/admin.token --keys /home/USER/electric-slime/hosts.keys --auth required --peer STANDBY_URL
+Restart=always
+RestartSec=5
+# the relay's own jobs come first
+Nice=10
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

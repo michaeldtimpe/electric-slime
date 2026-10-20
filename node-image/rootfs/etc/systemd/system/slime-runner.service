@@ -1,0 +1,22 @@
+[Unit]
+Description=electric-slime runner pool (claims tiers from the coordinator)
+After=network-online.target slime-firstboot.service
+Wants=network-online.target
+ConditionPathExists=/etc/slime/runner.env
+
+[Service]
+User=slime
+EnvironmentFile=/etc/slime/runner.env
+# models and shards, by sha; survives reboots, so a node re-embodies without re-downloading
+CacheDirectory=slime
+Environment=SLIME_CACHE=/var/cache/slime LLAMA_SERVER=/opt/llama/llama-server SLIME_KEY_FILE=/etc/slime/host.key
+ExecStart=/usr/bin/python3 -u /opt/electric-slime/slime.py pool --coord ${COORD} --slots ${SLOTS} --node %H
+Restart=always
+RestartSec=5
+Nice=5
+# the runner offers 80% of RAM to agents; this keeps sshd and tailscale breathing regardless
+MemoryHigh=85%
+MemoryMax=90%
+
+[Install]
+WantedBy=multi-user.target

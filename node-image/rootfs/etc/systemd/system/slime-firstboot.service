@@ -1,0 +1,14 @@
+[Unit]
+# runs every boot; the script exits at once unless it's the first boot or personalize.sh
+# left new files on the stick
+Description=electric-slime node personalisation
+RequiresMountsFor=/boot/efi
+Before=slime-tailscale-up.service slime-runner.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/slime-firstboot
+
+[Install]
+WantedBy=multi-user.target

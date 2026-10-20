@@ -1,0 +1,14 @@
+#!/bin/sh
+# Keep the stick's removable boot path portable and current: shim -> grubx64 in the same
+# directory, never shim's fbx64.efi fallback, which writes boot entries into the HOST
+# laptop's firmware and can reorder its BootOrder. Runs after every dpkg invocation.
+E=/boot/efi/EFI
+[ -f "$E/ubuntu/shimx64.efi" ] || exit 0
+mkdir -p "$E/BOOT"
+for pair in shimx64.efi:BOOTX64.EFI grubx64.efi:grubx64.efi mmx64.efi:mmx64.efi grub.cfg:grub.cfg; do
+    src=$E/ubuntu/${pair%%:*}
+    dst=$E/BOOT/${pair##*:}
+    if [ -f "$src" ] && ! cmp -s "$src" "$dst"; then cp "$src" "$dst"; fi
+done
+rm -f "$E/BOOT/fbx64.efi"
+exit 0

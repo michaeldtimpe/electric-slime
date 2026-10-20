@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>electric-slime</title>
+<style>
+  :root { --bg: #0f1115; --panel: #171a21; --line: #262b36; --text: #d7dce5; --dim: #8a93a6;
+          --accent: #7bd88f; --warn: #f0c062; --bad: #f07178; --t0: #6cb6ff; --t1: #b392f0;
+          --t2: #7bd88f; --t3: #f0c062; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f6f7f9; --panel: #fff; --line: #e3e6eb; --text: #1d2330; --dim: #5d6576;
+            --accent: #1a7f37; --warn: #9a6700; --bad: #cf222e; --t0: #0969da; --t1: #8250df;
+            --t2: #1a7f37; --t3: #9a6700; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline;
+           padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  h1 { font-size: 17px; margin: 0; }
+  h2 { font-size: 12px; margin: 0 0 8px; color: var(--dim); text-transform: uppercase;
+       letter-spacing: .06em; }
+  main { display: grid; gap: 12px; padding: 12px 16px 24px;
+         grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+            padding: 12px; min-width: 0; }
+  .wide { grid-column: 1 / -1; }
+  .dim { color: var(--dim); }
+  .pill { display: inline-block; padding: 1px 7px; border-radius: 99px; font-size: 12px;
+          border: 1px solid var(--line); }
+  .ok { color: var(--accent); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { text-align: left; padding: 4px 6px 4px 0; vertical-align: top; }
+  th { color: var(--dim); font-weight: 500; font-size: 12px; }
+  tr + tr td { border-top: 1px solid var(--line); }
+  .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden;
+         min-width: 60px; }
+  .bar > i { display: block; height: 100%; background: var(--accent); }
+  .agent { display: inline-block; margin: 1px 3px 1px 0; padding: 0 6px; border-radius: 4px;
+           font: 12px/18px ui-monospace, SFMono-Regular, Menlo, monospace; color: #fff; }
+  .t0 { background: var(--t0); } .t1 { background: var(--t1); } .t2 { background: var(--t2); }
+  .t3 { background: var(--t3); }
+  .answer { white-space: pre-wrap; max-height: 9em; overflow: auto; margin-top: 4px;
+            padding: 6px 8px; background: var(--bg); border-radius: 6px; font-size: 13px; }
+  .log { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .log div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  form { display: flex; gap: 8px; }
+  input { flex: 1; min-width: 0; padding: 7px 9px; border-radius: 6px; border: 1px solid var(--line);
+          background: var(--bg); color: var(--text); font: inherit; }
+  button { padding: 7px 12px; border-radius: 6px; border: 1px solid var(--line);
+           background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+</style>
+</head>
+<body>
+<header>
+  <h1>electric-slime</h1>
+  <span id="role" class="pill"></span>
+  <span id="budget" class="dim"></span>
+  <span id="lead" class="dim"></span>
+  <span id="canary" class="dim" title="known-answer questions asked when idle"></span>
+  <span id="esc"></span>
+  <span id="updated" class="dim" style="margin-left:auto"></span>
+</header>
+<main>
+  <section><h2>Tiers</h2><table id="tiers"></table></section>
+  <section><h2>Hosts</h2><table id="hosts"></table></section>
+  <section><h2>Immune</h2><div id="immune"></div></section>
+  <section class="wide"><h2>Ask</h2>
+    <form id="ask"><input id="q" placeholder="Ask the swarm a question" maxlength="2000">
+      <button>Ask</button></form>
+    <div id="asked" class="dim" style="margin-top:6px"></div>
+  </section>
+  <section class="wide"><h2>Goals</h2><div id="goals"></div></section>
+  <section class="wide"><h2>Decisions</h2><div id="decisions" class="log"></div></section>
+</main>
+<script>
+"use strict";
+// Everything shown here comes from the coordinator's JSON; user text (questions, answers)
+// only ever goes in through textContent.
+const $ = id => document.getElementById(id);
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === "text") e.textContent = v; else e.setAttribute(k, v);
+  }
+  for (const k of kids) if (k != null) e.append(k);
+  return e;
+}
+const hhmm = t => new Date(t * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+async function get(path) {
+  const r = await fetch(path, {cache: "no-store"});
+  if (!r.ok) throw new Error(path + " " + r.status);
+  return r.json();
+}
+
+function render(st, ctl, im) {
+  $("role").textContent = `${st.role} · epoch ${st.epoch}`;
+  $("role").className = "pill " + (st.role === "primary" ? "ok" : "warn");
+  $("budget").textContent = `${st.used} / ${st.budget} MB`;
+  $("lead").textContent = `lead: tier ${st.lead}`;
+  const can = ((ctl && ctl.canaries) || {}).recent || [];
+  $("canary").textContent = can.length ? `canaries ${can.filter(e => e.ok).length}/${can.length}` : "";
+  const esc = st.escalation || {};
+  $("esc").textContent = esc.on ? `escalated: ${esc.why}` : "";
+  $("esc").className = esc.on ? "pill warn" : "";
+  $("updated").textContent = "updated " + new Date().toLocaleTimeString();
+
+  const tiers = $("tiers"); tiers.replaceChildren(
+    el("tr", {}, el("th", {text: "tier"}), el("th", {text: "model"}), el("th", {text: "live / want"}),
+       el("th", {text: "base"})));
+  const ids = new Set([...Object.keys(st.wants), ...Object.keys(st.counts)]);
+  for (const t of [...ids].sort()) {
+    const live = st.counts[t] || 0, want = st.wants[t] || 0, base = (st.base || {})[t];
+    const ready = t === "0" || (st.ready || {})[t];
+    tiers.append(el("tr", {},
+      el("td", {}, el("span", {class: "agent t" + t, text: "t" + t})),
+      el("td", {text: (st.labels || {})[t] || ""}, ready ? null : el("span", {class: "dim", text: " (dormant)"})),
+      el("td", {class: live < want ? "warn" : "", text: `${live} / ${want}`}),
+      el("td", {class: "dim", text: base == null ? "" : String(base)})));
+  }
+
+  const byHost = {};
+  for (const a of Object.values(st.agents)) (byHost[a.host] = byHost[a.host] || []).push(a);
+  const hosts = $("hosts"); hosts.replaceChildren();
+  const speed = (ctl && ctl.speed) || {};
+  for (const [h, n] of Object.entries(st.nodes).sort()) {
+    const used = (st.node_used || {})[h] || 0, cap = n.capacity_mb || 1;
+    const agents = (byHost[h] || []).sort((a, b) => b.tier - a.tier).map(a =>
+      el("span", {class: "agent t" + a.tier, title: a.phase || "", text: `t${a.tier} ${(a.phase || "").slice(0, 14)}`}));
+    const p = n.pressure && n.pressure !== "ok" ? el("span", {class: "pill warn", text: `${n.pressure} ${n.pressure_why || ""}`}) : null;
+    hosts.append(el("tr", {},
+      el("td", {}, el("div", {text: h}), el("div", {class: "dim", text: speed[h] ? `speed ×${speed[h]}` : ""})),
+      el("td", {style: "width:40%"}, el("div", {class: "bar"}, el("i", {style: `width:${Math.min(100, 100 * used / cap)}%`})),
+         el("div", {class: "dim", text: `${used} / ${cap} MB`}), p),
+      el("td", {}, ...agents)));
+  }
+
+  const imm = $("immune"); imm.replaceChildren();
+  imm.append(el("div", {class: im.inflamed ? "warn" : "ok", text: im.inflamed ? "inflamed: cross-checking more" : "calm"}));
+  const t = el("table");
+  for (const [h, v] of Object.entries(im.hosts)) {
+    if (!v.score && !v.quarantined) continue;
+    t.append(el("tr", {}, el("td", {text: h}),
+      el("td", {class: v.quarantined ? "bad" : v.score >= 1 ? "warn" : "", text: (v.quarantined ? "QUARANTINED " : "") + v.score})));
+  }
+  if (t.childNodes.length) imm.append(t); else imm.append(el("div", {class: "dim", text: "no host has a score"}));
+  for (const e of (im.incidents || []).slice(-5).reverse())
+    imm.append(el("div", {class: "dim log", text: `${hhmm(e.t)} ${e.type} ${e.host || (e.hosts || []).join(",")} ${e.kind || ""}`}));
+
+  const goals = $("goals"); goals.replaceChildren();
+  for (const g of (st.goals || []).slice().reverse()) {
+    const done = g.tasks.filter(t => t.status === "done").length;
+    const failed = g.tasks.filter(t => t.status === "failed").length;
+    const head = el("div", {},
+      el("span", {class: "pill " + (g.status === "done" ? "ok" : "warn"), text: g.status}), " ",
+      g.canary ? el("span", {class: "pill", text: "canary"}) : null, g.canary ? " " : null,
+      el("strong", {text: g.text}),
+      el("span", {class: "dim", text: `  ${done}/${g.tasks.length} subtasks` + (failed ? `, ${failed} failed` : "") +
+        (g.done ? ` · ${Math.round(g.done - g.posted)} s` : "")}));
+    goals.append(el("div", {style: "margin-bottom:10px"}, head, g.answer ? el("div", {class: "answer", text: g.answer}) : null));
+  }
+
+  const dec = $("decisions"); dec.replaceChildren();
+  for (const e of ((ctl && ctl.decisions) || []).slice(-12).reverse())
+    dec.append(el("div", {text: `${hhmm(e.t)}  ${e.type === "scale" ? `t${e.tier} ${e.from}→${e.to}` : `${e.type} t${e.tier}`}  ${e.why}`}));
+}
+
+async function tick() {
+  try {
+    const [st, ctl, im] = await Promise.all([get("/state"), get("/control"), get("/immune")]);
+    render(st, ctl, im);
+  } catch (e) {
+    $("updated").textContent = "unreachable: " + e.message;
+  }
+}
+
+$("ask").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const text = $("q").value.trim();
+  if (!text) return;
+  try {
+    const r = await fetch("/goal/post", {method: "POST", headers: {"Content-Type": "application/json"},
+                                         body: JSON.stringify({text})});
+    const d = await r.json();
+    $("asked").textContent = d.ok ? `goal ${d.goal_id} posted` : `not posted: ${d.error}`;
+    $("q").value = "";
+    tick();
+  } catch (e) { $("asked").textContent = "could not post: " + e.message; }
+});
+
+tick();
+setInterval(tick, 3000);
+</script>
+</body>
+</html>

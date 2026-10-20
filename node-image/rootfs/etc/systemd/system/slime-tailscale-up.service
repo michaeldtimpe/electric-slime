@@ -1,0 +1,13 @@
+[Unit]
+Description=Join the tailnet with the stored swarm key
+After=tailscaled.service network-online.target slime-firstboot.service
+Wants=tailscaled.service network-online.target
+ConditionPathExists=/var/lib/slime/ts.key
+
+[Service]
+# simple, not oneshot: retrying for minutes must not hold up multi-user.target
+Type=simple
+ExecStart=/usr/local/sbin/slime-tailscale-up
+
+[Install]
+WantedBy=multi-user.target

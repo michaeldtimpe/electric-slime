@@ -1,0 +1,25 @@
+{
+  "version": "slime-v1",
+  "comment": "Real models (Qwen3, Apache-2.0, official GGUFs). max = most replicas the controller may scale a tier to; control = its timings. on_demand = assembled only when the swarm escalates (review disagreement stays high, or an admin says so). cost = MB an agent needs (model + KV cache + server); resource_total is the swarm-wide budget, and each host also caps what it offers. Tier N+1's model exists only as shards, carried by tier N, until a quorum stitches it and it hashes to the publisher's SHA-256.",
+  "resource_total": 30000,
+  "control": { "up_after": 10, "down_after": 120, "cooldown": 30, "place_timeout": 90 },
+  "tiers": [
+    { "tier": 0, "label": "Qwen3-0.6B Q8_0", "cost": 1100, "ctx": 2048, "seed": 5, "serve_floor": 3, "max": 6,
+      "model": { "repo": "Qwen/Qwen3-0.6B-GGUF", "file": "Qwen3-0.6B-Q8_0.gguf", "size": 639446688,
+                 "sha256": "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031" },
+      "provides": { "tier": 1, "n_shards": 4, "k": 4 } },
+    { "tier": 1, "label": "Qwen3-1.7B Q8_0", "cost": 2600, "ctx": 2048, "target": 3, "serve_floor": 2, "max": 4,
+      "model": { "repo": "Qwen/Qwen3-1.7B-GGUF", "file": "Qwen3-1.7B-Q8_0.gguf", "size": 1834426016,
+                 "sha256": "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a" },
+      "provides": { "tier": 2, "n_shards": 3, "k": 3 } },
+    { "tier": 2, "label": "Qwen3-4B Q4_K_M", "cost": 3600, "ctx": 4096, "target": 1, "serve_floor": 1, "max": 2,
+      "model": { "repo": "Qwen/Qwen3-4B-GGUF", "file": "Qwen3-4B-Q4_K_M.gguf", "size": 2497280256,
+                 "sha256": "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5" },
+      "provides": { "tier": 3, "n_shards": 2, "k": 2 } },
+    { "tier": 3, "label": "Qwen3-8B Q4_K_M", "cost": 6400, "ctx": 4096, "target": 1, "serve_floor": 1, "max": 1,
+      "on_demand": true,
+      "model": { "repo": "Qwen/Qwen3-8B-GGUF", "file": "Qwen3-8B-Q4_K_M.gguf", "size": 5027783488,
+                 "sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785" },
+      "provides": null }
+  ]
+}

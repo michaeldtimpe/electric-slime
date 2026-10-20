@@ -1,0 +1,21 @@
+{
+  "comment": "Known-answer questions the coordinator asks when the swarm is idle; each answer is checked against `expect` (a case-insensitive regex). The pass rate is a ground-truth quality signal for escalation. Chosen because small models often get them wrong.",
+  "canaries": [
+    {"id": "bat-ball", "text": "A bat and a ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost?",
+     "expect": "(\\$\\s?0?\\.05\\b|\\b5 cents|\\bfive cents)"},
+    {"id": "strawberry", "text": "How many times does the letter r appear in the word strawberry?",
+     "expect": "\\b(3|three)\\b"},
+    {"id": "widgets", "text": "If 5 machines take 5 minutes to make 5 widgets, how long would 100 machines take to make 100 widgets?",
+     "expect": "\\b(5|five) minutes\\b"},
+    {"id": "sheep", "text": "A farmer has 17 sheep and all but 9 run away. How many sheep does the farmer have left?",
+     "expect": "\\b(9|nine)\\b"},
+    {"id": "feathers", "text": "Which is heavier: a kilogram of feathers or a kilogram of steel?",
+     "expect": "(same|neither|equal|weigh the same|both weigh)"},
+    {"id": "multiply", "text": "What is 17 multiplied by 23?",
+     "expect": "\\b391\\b"},
+    {"id": "everest", "text": "Roughly what temperature, in degrees Celsius, does water boil at on the summit of Mount Everest?",
+     "expect": "\\b(6[89]|7[0-2])(\\.\\d)?\\s?(°|degrees|º)?\\s?c"},
+    {"id": "months", "text": "How many months of the year have 28 days?",
+     "expect": "\\b(all|12|twelve)\\b"}
+  ]
+}

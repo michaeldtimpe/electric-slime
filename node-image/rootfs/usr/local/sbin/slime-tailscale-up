@@ -1,0 +1,14 @@
+#!/bin/sh
+# Join (or re-join) the tailnet with the stored swarm key. Runs every boot; a node that
+# is already logged in just re-asserts its settings. Retries while the network comes up.
+KEY=/var/lib/slime/ts.key
+for _ in $(seq 40); do
+    if tailscale up --auth-key="file:$KEY" --hostname="$(hostname)" \
+            --accept-dns=false --operator=slime --timeout=60s; then
+        tailscale set --auto-update >/dev/null 2>&1 || true
+        exit 0
+    fi
+    sleep 15
+done
+echo "slime-tailscale-up: gave up; LAN still works" >&2
+exit 0

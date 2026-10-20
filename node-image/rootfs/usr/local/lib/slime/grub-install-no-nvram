@@ -1,0 +1,7 @@
+#!/bin/sh
+# electric-slime: this stick boots other people's laptops, so grub-install must never
+# write their UEFI boot entries. On cloud-style images, shim/grub upgrades go through
+# grub-multi-install, which runs a bare `grub-install --target=…` and ignores
+# grub2/update_nvram. customise.sh diverts the real binary to grub-install.real and puts
+# this wrapper at /usr/sbin/grub-install, so every caller gets --no-nvram.
+exec /usr/sbin/grub-install.real --no-nvram "$@"

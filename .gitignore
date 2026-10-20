@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+# runtime state and logs (coordinator writes these next to itself)
+events.jsonl*
+goals-archive.jsonl
+state*.json
+*.part
+# secrets: never commit
+admin.token
+hosts.keys
+host.key
+*.key
+# build artifacts (multi-GB images, OCI tars) and model blobs
+node-image/build/
+container/build/
+depot/
+cache/
+*.gguf
+*.img
+*.img.zst
+# this fleet's addresses (template: site.env.example)
+site.env

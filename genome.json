@@ -1,0 +1,27 @@
+{
+  "inherit": "progressive-unlock",
+  "comment": "Directives are executed by any agent whose tier >= directive.complexity; each agent acts on the most complex directive it is licensed for. The goal is the standing goal seeded at /seed; more arrive via `slime.py ask`.",
+  "directives": [
+    {
+      "id": "d0",
+      "complexity": 0,
+      "action": "serve",
+      "desc": "Base replica: heartbeat, carry a shard of the next tier, and answer the easy subtasks posted for subagents."
+    },
+    {
+      "id": "d1",
+      "complexity": 1,
+      "action": "serve",
+      "desc": "Mid tier: same serving behaviour; licensed for the hard subtasks too, and takes them first."
+    },
+    {
+      "id": "d2",
+      "complexity": 2,
+      "action": "orchestrate",
+      "desc": "Top tier: take a goal, split it into subtasks for the lower tiers, collect their answers and synthesise the result."
+    }
+  ],
+  "goal": {
+    "text": "How could a swarm of small language models running on old CPU-only laptops cooperate to answer questions better than any one of them alone? Cover how work is split, how answers are checked, and what happens when a laptop drops out."
+  }
+}

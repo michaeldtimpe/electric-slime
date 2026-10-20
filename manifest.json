@@ -1,0 +1,12 @@
+{
+  "version": "slime-v0",
+  "resource_total": 16,
+  "tiers": [
+    { "tier": 0, "label": "500M", "cost": 1, "seed": 8, "serve_floor": 1,
+      "provides": { "tier": 1, "n_shards": 4, "k": 4 } },
+    { "tier": 1, "label": "2B", "cost": 4, "target": 3, "serve_floor": 1,
+      "provides": { "tier": 2, "n_shards": 3, "k": 3 } },
+    { "tier": 2, "label": "7B", "cost": 10, "target": 1, "serve_floor": 1,
+      "provides": null }
+  ]
+}

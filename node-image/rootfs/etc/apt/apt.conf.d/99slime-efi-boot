@@ -1,0 +1,2 @@
+// see /usr/local/sbin/slime-sync-efi-boot
+DPkg::Post-Invoke { "/usr/local/sbin/slime-sync-efi-boot || true"; };

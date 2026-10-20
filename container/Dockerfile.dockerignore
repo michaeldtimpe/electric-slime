@@ -1,0 +1,5 @@
+# the build context is the project root; the image needs exactly three files from it
+*
+!slime.py
+!manifest.json
+!genome.json

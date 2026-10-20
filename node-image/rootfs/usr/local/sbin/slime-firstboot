@@ -1,0 +1,83 @@
+#!/bin/sh
+# Node personalisation. Runs on the first boot, and again on any boot where
+# personalize.sh has left new files on the stick's EFI partition (/boot/efi/slime/),
+# so an already-booted stick can be re-personalised from the Mac. Secrets are moved into
+# root-only places on the root filesystem and deleted from the FAT partition.
+set -eu
+SRC=/boot/efi/slime
+STATE=/var/lib/slime
+install -d -m 700 "$STATE"
+
+fresh=
+for f in node.env wifi.json ts.key host.key; do
+    if [ -f "$SRC/$f" ]; then fresh=1; fi
+done
+if [ -f "$STATE/firstboot.done" ] && [ -z "$fresh" ]; then exit 0; fi
+
+# defaults < values applied last time < a new node.env (written by us, not a third party)
+mac=$(cat /sys/class/net/e*/address /sys/class/net/w*/address 2>/dev/null | head -1 | tr -d : | cut -c9-)
+NODE_NAME=slime-${mac:-node}
+COORD=   # primary,standby: personalize.sh supplies it in node.env
+SLOTS=3
+WIFI_COUNTRY=US
+SLIME_MAX_TIER=1    # a 2-core laptop serves; the orchestrator belongs on something faster
+[ -f /etc/slime/node.env ] && . /etc/slime/node.env
+if [ -f "$SRC/node.env" ]; then
+    . "$SRC/node.env"
+    mv -f "$SRC/node.env" "$SRC/node.env.applied"     # keep a record; stop retriggering
+fi
+
+install -d -m 755 /etc/slime
+printf 'NODE_NAME=%s\nCOORD=%s\nSLOTS=%s\nWIFI_COUNTRY=%s\nSLIME_MAX_TIER=%s\n' \
+    "$NODE_NAME" "$COORD" "$SLOTS" "$WIFI_COUNTRY" "$SLIME_MAX_TIER" > /etc/slime/node.env
+printf 'COORD=%s\nSLOTS=%s\nSLIME_MAX_TIER=%s\n' "$COORD" "$SLOTS" "$SLIME_MAX_TIER" > /etc/slime/runner.env
+hostnamectl set-hostname "$NODE_NAME"
+sed -i '/^127\.0\.1\.1[[:space:]]/d' /etc/hosts
+printf '127.0.1.1\t%s\n' "$NODE_NAME" >> /etc/hosts
+
+# wifi: the iwlwifi interface can take a moment to appear after firmware load
+if [ -f "$SRC/wifi.json" ]; then
+    for _ in $(seq 30); do
+        ls /sys/class/net/*/wireless >/dev/null 2>&1 && break
+        sleep 1
+    done
+    umask 077
+    python3 /usr/local/lib/slime/write-netplan-wifi.py "$SRC/wifi.json" "$WIFI_COUNTRY" \
+        > /etc/netplan/60-slime-wifi.yaml
+    rm -f "$SRC/wifi.json"
+fi
+
+# the swarm key is ephemeral + reusable, so keep it: the node re-authenticates with it
+# after any reboot long enough for the tailnet to have dropped it
+# the runner's signing key: readable by the runner (group slime), nobody else
+if [ -f "$SRC/host.key" ]; then
+    install -m 640 -o root -g slime "$SRC/host.key" /etc/slime/host.key
+    rm -f "$SRC/host.key"
+fi
+
+if [ -f "$SRC/ts.key" ]; then
+    install -m 600 "$SRC/ts.key" "$STATE/ts.key"
+    rm -f "$SRC/ts.key"
+fi
+
+root=$(findmnt -no SOURCE /)
+disk=/dev/$(lsblk -no PKNAME "$root")
+
+# legacy-BIOS hosts boot from the stick's MBR: grub-pc upgrades must rewrite it there, or
+# new modules meet old boot code. by-id follows the stick to whichever laptop it is in.
+id=
+for l in /dev/disk/by-id/usb-*; do
+    if [ -e "$l" ] && [ "$(readlink -f "$l")" = "$disk" ]; then id=$l; break; fi
+done
+if [ -n "$id" ]; then
+    echo "grub-pc grub-pc/install_devices multiselect $id" | debconf-set-selections
+fi
+
+# initramfs growroot normally filled the stick already; this is the fallback
+growpart "$disk" "$(cat "/sys/class/block/$(basename "$root")/partition")" || true
+resize2fs "$root" || true
+
+netplan apply || true
+systemctl try-restart slime-runner.service || true
+touch "$STATE/firstboot.done"
+echo "slime-firstboot: $NODE_NAME personalised (coord $COORD, $SLOTS slots${id:+, grub-pc -> $id})"
